@@ -127,7 +127,7 @@ t_Cu, idx_Cu = find_crossing(t_global, Ddot_Cu, Rcrit)
 fig, ax = plt.subplots(figsize=(10, 6))
 
 ax.plot(t_global, Ddot_Lu_n, label="177Lu", linewidth=2, color='green')
-ax.plot(t_global, Ddot_Cu_n, label="64Cu", linewidth=2, color='yellow')
+ax.plot(t_global, Ddot_Cu_n, label="64Cu", linewidth=2, color='red')
 
 ax.axhline(Rcrit_n, linestyle='--', linewidth=2, label="Rcrit")
 
