@@ -20,7 +20,7 @@ t_global = np.linspace(0, t_max, n_points)
 # -----------------------------
 Tphys_Lu = 160
 Tphys_Cu64 = 12.7
-Tphys_Cu67 = 62.0  # approximate
+Tphys_Cu67 = 62.0
 
 # -----------------------------
 # Trapezoid integration
@@ -65,6 +65,9 @@ def compute_A0_for_target(D_target, Tphys, Tbio, S):
 # -----------------------------
 # Sidebar controls
 # -----------------------------
+st.sidebar.header("Display Mode")
+mode = st.sidebar.radio("Y-axis mode", ["Absolute", "Normalised"])
+
 st.sidebar.header("Global Control")
 D_target = st.sidebar.slider("Target Dose (Gy)", 10.0, 200.0, 50.0)
 
@@ -108,44 +111,64 @@ Ddot_Cu67, A_Cu67, _, total_Cu67, eff_Cu67, waste_Cu67, eff_ratio_Cu67 = compute
 # -----------------------------
 fig, ax = plt.subplots(figsize=(10, 6))
 
-# Dose rate curves
-ax.plot(t_global, Ddot_Lu, label="177Lu", linewidth=2)
-ax.plot(t_global, Ddot_Cu64, label="64Cu", linewidth=2)
-ax.plot(t_global, Ddot_Cu67, label="67Cu", linewidth=2)
+if mode == "Normalised":
+    max_val = max(Ddot_Lu.max(), Ddot_Cu64.max(), Ddot_Cu67.max())
+
+    Ddot_Lu_plot = Ddot_Lu / max_val
+    Ddot_Cu64_plot = Ddot_Cu64 / max_val
+    Ddot_Cu67_plot = Ddot_Cu67 / max_val
+    Rcrit_plot = Rcrit / max_val
+
+    ax.set_ylim(0, 1.0)
+    ax.set_ylabel("Normalised Dose Rate")
+
+else:
+    Ddot_Lu_plot = Ddot_Lu
+    Ddot_Cu64_plot = Ddot_Cu64
+    Ddot_Cu67_plot = Ddot_Cu67
+    Rcrit_plot = Rcrit
+
+    ax.set_ylim(0, max(Ddot_Lu.max(), Ddot_Cu64.max(), Ddot_Cu67.max())*1.2)
+    ax.set_ylabel("Dose Rate (Gy/h)")
+
+# Curves
+ax.plot(t_global, Ddot_Lu_plot, label="177Lu", linewidth=2)
+ax.plot(t_global, Ddot_Cu64_plot, label="64Cu", linewidth=2)
+ax.plot(t_global, Ddot_Cu67_plot, label="67Cu", linewidth=2)
 
 # Rcrit
-ax.axhline(Rcrit, linestyle='--', color='red', linewidth=2, label="Rcrit")
+ax.axhline(Rcrit_plot, linestyle='--', color='red', linewidth=2, label="Rcrit")
 
-# Shading effective and wasted
-for Ddot, color in zip([Ddot_Lu, Ddot_Cu64, Ddot_Cu67], ['green','orange','blue']):
-    effective_mask = Ddot > Rcrit
-    ax.fill_between(t_global, Rcrit, Ddot, where=effective_mask, color=color, alpha=0.25)
-    ax.fill_between(t_global, 0, np.minimum(Ddot, Rcrit), color=color, alpha=0.08)
+# Shading
+for Ddot_plot, color in zip([Ddot_Lu_plot, Ddot_Cu64_plot, Ddot_Cu67_plot], ['green','orange','blue']):
+    effective_mask = Ddot_plot > Rcrit_plot
+    ax.fill_between(t_global, Rcrit_plot, Ddot_plot, where=effective_mask, color=color, alpha=0.25)
+    ax.fill_between(t_global, 0, np.minimum(Ddot_plot, Rcrit_plot), color=color, alpha=0.08)
 
 # -----------------------------
-# Text boxes
+# Text boxes (unchanged physics)
 # -----------------------------
 texts = [
     f"177Lu\nA0: {A0_Lu:.2f} MBq\nWasted: {waste_Lu:.2f} Gy\nEfficiency: {eff_ratio_Lu*100:.1f}%",
     f"64Cu\nA0: {A0_Cu64:.2f} MBq\nWasted: {waste_Cu64:.2f} Gy\nEfficiency: {eff_ratio_Cu64*100:.1f}%",
     f"67Cu\nA0: {A0_Cu67:.2f} MBq\nWasted: {waste_Cu67:.2f} Gy\nEfficiency: {eff_ratio_Cu67*100:.1f}%"
 ]
+
 for i, txt in enumerate(texts):
     ax.text(0.02, 0.95-0.25*i, txt, transform=ax.transAxes,
             fontsize=10, va='top', bbox=dict(boxstyle="round", alpha=0.2))
 
-# Peak ratio Cu64 / Cu67
+# Peak ratio
 peak_ratio = Ddot_Cu64.max() / Ddot_Cu67.max()
-ax.text(0.65, 0.95, f"Peak Ratio (Cu64/Cu67): {peak_ratio:.2f}×", transform=ax.transAxes,
-        fontsize=11, va='top', bbox=dict(boxstyle="round", alpha=0.3))
+ax.text(0.65, 0.95, f"Peak Ratio (Cu64/Cu67): {peak_ratio:.2f}×",
+        transform=ax.transAxes, fontsize=11, va='top',
+        bbox=dict(boxstyle="round", alpha=0.3))
 
 # -----------------------------
-# Axis
+# Axis + styling
 # -----------------------------
 ax.set_xlim(0, t_max)
-ax.set_ylim(0, max(Ddot_Lu.max(), Ddot_Cu64.max(), Ddot_Cu67.max())*1.2)
 ax.set_xlabel("Time (hours)")
-ax.set_ylabel("Dose Rate (Gy/h)")
 ax.set_title("Dose Rate Comparison (Same Total Dose)")
 ax.legend()
 ax.grid(True)
