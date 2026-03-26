@@ -20,6 +20,7 @@ t_global = np.linspace(0, t_max, n_points)
 # -----------------------------
 Tphys_Lu = 160
 Tphys_Cu = 12.7
+Tphys_Cu67 = 61.8  # approx 67Cu physical half-life
 
 # -----------------------------
 # Trapezoid integration
@@ -88,6 +89,9 @@ Tbio_Lu = st.sidebar.slider("Lu Tbio (h)", 1.0, 300.0, 200.0)
 st.sidebar.header("64Cu")
 Tbio_Cu = st.sidebar.slider("Cu Tbio (h)", 1.0, 200.0, 50.0)
 
+st.sidebar.header("67Cu")
+Tbio_Cu67 = st.sidebar.slider("67Cu Tbio (h)", 1.0, 200.0, 50.0)
+
 S = 0.05
 
 # -----------------------------
@@ -95,6 +99,7 @@ S = 0.05
 # -----------------------------
 A0_Lu = compute_A0_for_target(D_target, Tphys_Lu, Tbio_Lu, S)
 A0_Cu = compute_A0_for_target(D_target, Tphys_Cu, Tbio_Cu, S)
+A0_Cu67 = compute_A0_for_target(D_target, Tphys_Cu67, Tbio_Cu67, S)
 
 # -----------------------------
 # Dose calculations
@@ -107,19 +112,18 @@ Ddot_Cu, A_Cu, Rcrit, total_Cu, eff_Cu, waste_Cu, eff_ratio_Cu = compute_dose(
     A0_Cu, Tphys_Cu, Tbio_Cu, S, alpha, Tav
 )
 
+Ddot_Cu67, A_Cu67, Rcrit, total_Cu67, eff_Cu67, waste_Cu67, eff_ratio_Cu67 = compute_dose(
+    A0_Cu67, Tphys_Cu67, Tbio_Cu67, S, alpha, Tav
+)
+
 # -----------------------------
 # Normalisation for plotting only
 # -----------------------------
-max_val = max(Ddot_Lu.max(), Ddot_Cu.max())
+max_val = max(Ddot_Lu.max(), Ddot_Cu.max(), Ddot_Cu67.max())
 Ddot_Lu_n = Ddot_Lu / max_val
 Ddot_Cu_n = Ddot_Cu / max_val
+Ddot_Cu67_n = Ddot_Cu67 / max_val
 Rcrit_n = Rcrit / max_val
-
-# -----------------------------
-# Crossing points
-# -----------------------------
-t_Lu, idx_Lu = find_crossing(t_global, Ddot_Lu, Rcrit)
-t_Cu, idx_Cu = find_crossing(t_global, Ddot_Cu, Rcrit)
 
 # -----------------------------
 # Plot
@@ -128,58 +132,41 @@ fig, ax = plt.subplots(figsize=(10, 6))
 
 ax.plot(t_global, Ddot_Lu_n, label="177Lu", linewidth=2)
 ax.plot(t_global, Ddot_Cu_n, label="64Cu", linewidth=2)
+ax.plot(t_global, Ddot_Cu67_n, label="67Cu", linewidth=2)
 
 ax.axhline(Rcrit_n, linestyle='--', linewidth=2, label="Rcrit")
 
-# Shading
-mask_Lu = Ddot_Lu_n > Rcrit_n
-mask_Cu = Ddot_Cu_n > Rcrit_n
-
-# Not effective (below Rcrit)
+# Shading: Not effective (below Rcrit)
 ax.fill_between(t_global, 0, np.minimum(Ddot_Lu_n, Rcrit_n), alpha=0.08)
 ax.fill_between(t_global, 0, np.minimum(Ddot_Cu_n, Rcrit_n), alpha=0.08)
+ax.fill_between(t_global, 0, np.minimum(Ddot_Cu67_n, Rcrit_n), alpha=0.08)
 
-# Effective (above Rcrit)
-ax.fill_between(t_global, Rcrit_n, Ddot_Lu_n, where=mask_Lu, alpha=0.25)
-ax.fill_between(t_global, Rcrit_n, Ddot_Cu_n, where=mask_Cu, alpha=0.25)
-
-# Crossing markers
-if idx_Lu is not None:
-    ax.scatter(t_Lu, Rcrit_n)
-    ax.annotate("Lu", (t_Lu, Rcrit_n), xytext=(10, 10), textcoords='offset points')
-
-if idx_Cu is not None:
-    ax.scatter(t_Cu, Rcrit_n)
-    ax.annotate("Cu", (t_Cu, Rcrit_n), xytext=(10, -15), textcoords='offset points')
+# Shading: Effective (above Rcrit)
+ax.fill_between(t_global, Rcrit_n, Ddot_Lu_n, where=Ddot_Lu_n>Rcrit_n, alpha=0.25)
+ax.fill_between(t_global, Rcrit_n, Ddot_Cu_n, where=Ddot_Cu_n>Rcrit_n, alpha=0.25)
+ax.fill_between(t_global, Rcrit_n, Ddot_Cu67_n, where=Ddot_Cu67_n>Rcrit_n, alpha=0.25)
 
 # -----------------------------
 # Text boxes
 # -----------------------------
 text_Lu = (
-    f"177Lu\n"
-    f"A0: {A0_Lu:.2f} MBq\n"
-    f"Wasted: {waste_Lu:.2f} Gy\n"
-    f"Efficiency: {eff_ratio_Lu*100:.1f}%"
+    f"177Lu\nA0: {A0_Lu:.2f} MBq\nWasted: {waste_Lu:.2f} Gy\nEfficiency: {eff_ratio_Lu*100:.1f}%"
 )
-
 text_Cu = (
-    f"64Cu\n"
-    f"A0: {A0_Cu:.2f} MBq\n"
-    f"Wasted: {waste_Cu:.2f} Gy\n"
-    f"Efficiency: {eff_ratio_Cu*100:.1f}%"
+    f"64Cu\nA0: {A0_Cu:.2f} MBq\nWasted: {waste_Cu:.2f} Gy\nEfficiency: {eff_ratio_Cu*100:.1f}%"
+)
+text_Cu67 = (
+    f"67Cu\nA0: {A0_Cu67:.2f} MBq\nWasted: {waste_Cu67:.2f} Gy\nEfficiency: {eff_ratio_Cu67*100:.1f}%"
 )
 
-peak_ratio = Ddot_Cu.max() / Ddot_Lu.max()
-text_global = f"Peak Ratio (Cu/Lu): {peak_ratio:.2f}×"
+peak_ratio_Cu_Lu = Ddot_Cu.max()/Ddot_Lu.max()
+peak_ratio_Cu67_Lu = Ddot_Cu67.max()/Ddot_Lu.max()
+text_global = f"Peak Ratio (Cu/Lu): {peak_ratio_Cu_Lu:.2f}×\nPeak Ratio (67Cu/Lu): {peak_ratio_Cu67_Lu:.2f}×"
 
-ax.text(0.02, 0.95, text_Lu, transform=ax.transAxes,
-        fontsize=10, va='top', bbox=dict(boxstyle="round", alpha=0.2))
-
-ax.text(0.02, 0.65, text_Cu, transform=ax.transAxes,
-        fontsize=10, va='top', bbox=dict(boxstyle="round", alpha=0.2))
-
-ax.text(0.65, 0.95, text_global, transform=ax.transAxes,
-        fontsize=11, va='top', bbox=dict(boxstyle="round", alpha=0.3))
+ax.text(0.02, 0.95, text_Lu, transform=ax.transAxes, fontsize=10, va='top', bbox=dict(boxstyle="round", alpha=0.2))
+ax.text(0.02, 0.65, text_Cu, transform=ax.transAxes, fontsize=10, va='top', bbox=dict(boxstyle="round", alpha=0.2))
+ax.text(0.02, 0.35, text_Cu67, transform=ax.transAxes, fontsize=10, va='top', bbox=dict(boxstyle="round", alpha=0.2))
+ax.text(0.65, 0.95, text_global, transform=ax.transAxes, fontsize=11, va='top', bbox=dict(boxstyle="round", alpha=0.3))
 
 # -----------------------------
 # Axis
