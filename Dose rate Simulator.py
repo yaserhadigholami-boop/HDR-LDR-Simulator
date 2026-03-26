@@ -70,7 +70,7 @@ D_target = st.sidebar.slider("Target Dose (Gy)", 10.0, 200.0, 50.0)
 
 st.sidebar.header("Biology (Shared)")
 alpha = st.sidebar.slider("alpha (Gy⁻¹)", 0.05, 1.0, 0.3)
-Tav = st.sidebar.slider("Repair Half-Time Tav (h)", 10.0, 200.0, 72.0)
+Tav = st.sidebar.slider("Average proliferation time Tav (h)", 10.0, 200.0, 72.0)
 
 st.sidebar.header("177Lu")
 Tbio_Lu = st.sidebar.slider("Lu Tbio (h)", 1.0, 300.0, 200.0)
