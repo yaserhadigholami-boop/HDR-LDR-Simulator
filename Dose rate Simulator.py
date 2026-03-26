@@ -145,7 +145,7 @@ ax.fill_between(t_global, Rcrit_n, Ddot_Cu_n, where=mask_Cu, alpha=0.25)
 
 # Crossing markers
 if idx_Lu is not None:
-    ax.scatter(t_Lu, Rcrit_n,color='blue')
+    ax.scatter(t_Lu, Rcrit_n,color='red')
     ax.annotate("Lu", (t_Lu, Rcrit_n), xytext=(10, 10), textcoords='offset points')
 
 if idx_Cu is not None:
