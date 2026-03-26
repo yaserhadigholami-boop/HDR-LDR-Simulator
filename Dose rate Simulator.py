@@ -129,7 +129,7 @@ fig, ax = plt.subplots(figsize=(10, 6))
 ax.plot(t_global, Ddot_Lu_n, label="177Lu", linewidth=2)
 ax.plot(t_global, Ddot_Cu_n, label="64Cu", linewidth=2)
 
-ax.axhline(Rcrit_n, linestyle='--', linewidth=2, label="Rcrit",color='red')
+ax.axhline(Rcrit_n, linestyle='--', linewidth=2, label="Rcrit")
 
 # Shading
 mask_Lu = Ddot_Lu_n > Rcrit_n
