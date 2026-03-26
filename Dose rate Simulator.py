@@ -54,7 +54,7 @@ def compute_dose(A0, Tphys, Tbio, S, alpha, Tav):
     return Ddot, A, Rcrit, total, effective, wasted, efficiency
 
 # -----------------------------
-# Compute A0
+# Compute A0 for target dose
 # -----------------------------
 def compute_A0_for_target(D_target, Tphys, Tbio, S):
     A_norm = activity_curve(1.0, Tphys, Tbio, t_global)
@@ -67,15 +67,13 @@ def compute_A0_for_target(D_target, Tphys, Tbio, S):
 def find_crossing(t, curve, threshold):
     diff = curve - threshold
     idx = np.where(np.diff(np.sign(diff)) != 0)[0]
-
     if len(idx) == 0:
         return None, None
-
     i = idx[0]
     return t[i], i
 
 # -----------------------------
-# Sidebar
+# Sidebar controls
 # -----------------------------
 st.sidebar.header("Global Control")
 D_target = st.sidebar.slider("Target Dose (Gy)", 10.0, 200.0, 50.0)
@@ -93,7 +91,7 @@ Tbio_Cu = st.sidebar.slider("Cu Tbio (h)", 1.0, 200.0, 50.0)
 S = 0.05
 
 # -----------------------------
-# Compute correct A0
+# Compute A0
 # -----------------------------
 A0_Lu = compute_A0_for_target(D_target, Tphys_Lu, Tbio_Lu, S)
 A0_Cu = compute_A0_for_target(D_target, Tphys_Cu, Tbio_Cu, S)
@@ -110,10 +108,9 @@ Ddot_Cu, A_Cu, Rcrit, total_Cu, eff_Cu, waste_Cu, eff_ratio_Cu = compute_dose(
 )
 
 # -----------------------------
-# Normalisation (visual only)
+# Normalisation for plotting only
 # -----------------------------
 max_val = max(Ddot_Lu.max(), Ddot_Cu.max())
-
 Ddot_Lu_n = Ddot_Lu / max_val
 Ddot_Cu_n = Ddot_Cu / max_val
 Rcrit_n = Rcrit / max_val
@@ -138,11 +135,11 @@ ax.axhline(Rcrit_n, linestyle='--', linewidth=2, label="Rcrit")
 mask_Lu = Ddot_Lu_n > Rcrit_n
 mask_Cu = Ddot_Cu_n > Rcrit_n
 
-# Not effective
+# Not effective (below Rcrit)
 ax.fill_between(t_global, 0, np.minimum(Ddot_Lu_n, Rcrit_n), alpha=0.08)
 ax.fill_between(t_global, 0, np.minimum(Ddot_Cu_n, Rcrit_n), alpha=0.08)
 
-# Effective
+# Effective (above Rcrit)
 ax.fill_between(t_global, Rcrit_n, Ddot_Lu_n, where=mask_Lu, alpha=0.25)
 ax.fill_between(t_global, Rcrit_n, Ddot_Cu_n, where=mask_Cu, alpha=0.25)
 
@@ -156,12 +153,11 @@ if idx_Cu is not None:
     ax.annotate("Cu", (t_Cu, Rcrit_n), xytext=(10, -15), textcoords='offset points')
 
 # -----------------------------
-# Text boxes (FINAL)
+# Text boxes
 # -----------------------------
 text_Lu = (
     f"177Lu\n"
     f"A0: {A0_Lu:.2f} MBq\n"
-    f"Cross: {t_Lu:.2f} h\n"
     f"Wasted: {waste_Lu:.2f} Gy\n"
     f"Efficiency: {eff_ratio_Lu*100:.1f}%"
 )
@@ -169,13 +165,11 @@ text_Lu = (
 text_Cu = (
     f"64Cu\n"
     f"A0: {A0_Cu:.2f} MBq\n"
-    f"Cross: {t_Cu:.2f} h\n"
     f"Wasted: {waste_Cu:.2f} Gy\n"
     f"Efficiency: {eff_ratio_Cu*100:.1f}%"
 )
 
 peak_ratio = Ddot_Cu.max() / Ddot_Lu.max()
-
 text_global = f"Peak Ratio (Cu/Lu): {peak_ratio:.2f}×"
 
 ax.text(0.02, 0.95, text_Lu, transform=ax.transAxes,
@@ -192,11 +186,9 @@ ax.text(0.65, 0.95, text_global, transform=ax.transAxes,
 # -----------------------------
 ax.set_xlim(0, t_max)
 ax.set_ylim(0, 1.0)
-
 ax.set_xlabel("Time (hours)")
 ax.set_ylabel("Normalised Dose Rate")
 ax.set_title("Dose Rate Comparison (Same Total Dose)")
-
 ax.legend()
 ax.grid(True)
 
