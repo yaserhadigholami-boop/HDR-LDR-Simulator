@@ -161,7 +161,12 @@ text_Cu67 = (
 
 peak_ratio_Cu_Lu = Ddot_Cu.max()/Ddot_Lu.max()
 peak_ratio_Cu67_Lu = Ddot_Cu67.max()/Ddot_Lu.max()
-text_global = f"Peak Ratio (Cu/Lu): {peak_ratio_Cu_Lu:.2f}×\nPeak Ratio (67Cu/Lu): {peak_ratio_Cu67_Lu:.2f}×"
+peak_ratio_Cu64_Cu67 = Ddot_Cu.max() / Ddot_Cu67.max()
+text_global = (
+    f"Peak Ratio (Cu/Lu): {peak_ratio_Cu_Lu:.2f}×\n"
+    f"Peak Ratio (67Cu/Lu): {peak_ratio_Cu67_Lu:.2f}×\n"
+    f"Peak Ratio (Cu64/67Cu): {peak_ratio_Cu64_Cu67:.2f}×"
+)
 
 ax.text(0.02, 0.95, text_Lu, transform=ax.transAxes, fontsize=10, va='top', bbox=dict(boxstyle="round", alpha=0.2))
 ax.text(0.02, 0.65, text_Cu, transform=ax.transAxes, fontsize=10, va='top', bbox=dict(boxstyle="round", alpha=0.2))
