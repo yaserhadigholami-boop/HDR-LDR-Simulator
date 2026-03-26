@@ -218,4 +218,3 @@ for s in sliders_Lu + sliders_Cu64 + sliders_Cu67:
     s.on_changed(update)
 slider_target.on_changed(update)
 
-plt.show()
