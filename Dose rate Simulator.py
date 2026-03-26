@@ -6,7 +6,7 @@ import streamlit as st
 # Page config
 # -----------------------------
 st.set_page_config(layout="wide")
-st.title("Radiopharmaceutical Dose Efficiency Model")
+st.title("Dose Rate Comparison (PERT Concept)")
 
 # -----------------------------
 # Time axis
@@ -16,10 +16,10 @@ n_points = 2000
 t_global = np.linspace(0, t_max, n_points)
 
 # -----------------------------
-# Fixed physical half-lives (hours)
+# Physical half-lives (hours)
 # -----------------------------
-Tphys_Lu = 160   # 177Lu
-Tphys_Cu = 12.7  # 64Cu
+Tphys_Lu = 160
+Tphys_Cu = 12.7
 
 # -----------------------------
 # Functions
@@ -27,25 +27,16 @@ Tphys_Cu = 12.7  # 64Cu
 def trapz_manual(y, x):
     return np.sum((x[1:] - x[:-1]) * (y[1:] + y[:-1]) / 2)
 
-def activity_curve(A0, Tphys, Tbio, t_array):
+def activity_curve(A0, Tphys, Tbio, t):
     lambda_p = np.log(2) / Tphys
     lambda_b = np.log(2) / Tbio
     return A0 * (lambda_b / (lambda_b - lambda_p)) * (
-        np.exp(-lambda_p * t_array) - np.exp(-lambda_b * t_array)
+        np.exp(-lambda_p * t) - np.exp(-lambda_b * t)
     )
 
-def compute_dose(A0, Tphys, Tbio, S, alpha, Tav):
-    A = activity_curve(A0, Tphys, Tbio, t_global)
-    Ddot = S * A
-    Rcrit = 0.693 / (alpha * Tav)
-
-    mask = Ddot > Rcrit
-    effective = trapz_manual(Ddot[mask], t_global[mask]) if mask.any() else 0
-    wasted = trapz_manual(np.minimum(Ddot, Rcrit), t_global)
-    total = trapz_manual(Ddot, t_global)
-    efficiency = effective / total if total > 0 else 0
-
-    return Ddot, Rcrit, total, effective, wasted, efficiency
+def compute_dose(A0, Tphys, Tbio, S, t):
+    A = activity_curve(A0, Tphys, Tbio, t)
+    return S * A
 
 def compute_A0_for_target(D_target, Tphys, Tbio, S):
     A_norm = activity_curve(1.0, Tphys, Tbio, t_global)
@@ -58,17 +49,16 @@ def compute_A0_for_target(D_target, Tphys, Tbio, S):
 st.sidebar.header("Global Control")
 D_target = st.sidebar.slider("Target Dose (Gy)", 10.0, 200.0, 50.0)
 
-st.sidebar.header("177Lu Parameters")
+st.sidebar.header("Biology (Shared)")
+alpha = st.sidebar.slider("alpha (Gy⁻¹)", 0.05, 1.0, 0.3)
+Tav = st.sidebar.slider("Repair Half-Time Tav (h)", 10.0, 200.0, 72.0)
+
+st.sidebar.header("177Lu")
 Tbio_Lu = st.sidebar.slider("Lu Tbio (h)", 1.0, 300.0, 200.0)
-alpha_Lu = st.sidebar.slider("Lu alpha (Gy⁻¹)", 0.05, 1.0, 0.3)
-Tav_Lu = st.sidebar.slider("Lu Tav (h)", 10.0, 200.0, 72.0)
 
-st.sidebar.header("64Cu Parameters")
+st.sidebar.header("64Cu")
 Tbio_Cu = st.sidebar.slider("Cu Tbio (h)", 1.0, 200.0, 50.0)
-alpha_Cu = st.sidebar.slider("Cu alpha (Gy⁻¹)", 0.05, 1.0, 0.3)
-Tav_Cu = st.sidebar.slider("Cu Tav (h)", 10.0, 200.0, 72.0)
 
-# Fixed S (you can expose later if needed)
 S = 0.05
 
 # -----------------------------
@@ -78,76 +68,85 @@ A0_Lu = compute_A0_for_target(D_target, Tphys_Lu, Tbio_Lu, S)
 A0_Cu = compute_A0_for_target(D_target, Tphys_Cu, Tbio_Cu, S)
 
 # -----------------------------
-# Compute dose
+# Dose rate curves
 # -----------------------------
-Ddot_Lu, Rcrit_Lu, total_Lu, eff_Lu, waste_Lu, eff_ratio_Lu = compute_dose(
-    A0_Lu, Tphys_Lu, Tbio_Lu, S, alpha_Lu, Tav_Lu
-)
-
-Ddot_Cu, Rcrit_Cu, total_Cu, eff_Cu, waste_Cu, eff_ratio_Cu = compute_dose(
-    A0_Cu, Tphys_Cu, Tbio_Cu, S, alpha_Cu, Tav_Cu
-)
+Ddot_Lu = compute_dose(A0_Lu, Tphys_Lu, Tbio_Lu, S, t_global)
+Ddot_Cu = compute_dose(A0_Cu, Tphys_Cu, Tbio_Cu, S, t_global)
 
 # -----------------------------
-# Normalisation (shared Y scale)
+# Shared Rcrit (IMPORTANT)
+# -----------------------------
+Rcrit = 0.693 / (alpha * Tav)
+
+# -----------------------------
+# Normalisation (shared scale)
 # -----------------------------
 max_val = max(Ddot_Lu.max(), Ddot_Cu.max())
 
-Ddot_Lu_norm = Ddot_Lu / max_val
-Ddot_Cu_norm = Ddot_Cu / max_val
-Rcrit_Lu_norm = Rcrit_Lu / max_val
-Rcrit_Cu_norm = Rcrit_Cu / max_val
+Ddot_Lu_n = Ddot_Lu / max_val
+Ddot_Cu_n = Ddot_Cu / max_val
+Rcrit_n = Rcrit / max_val
 
 # -----------------------------
-# Plotting (shared axes)
+# Plot
 # -----------------------------
 fig, ax = plt.subplots(figsize=(10, 6))
 
-# ---- Curves ----
-ax.plot(t_global, Ddot_Lu_norm, label="177Lu", linewidth=2)
-ax.plot(t_global, Ddot_Cu_norm, label="64Cu", linewidth=2)
+# Curves
+ax.plot(t_global, Ddot_Lu_n, label="177Lu", linewidth=2)
+ax.plot(t_global, Ddot_Cu_n, label="64Cu", linewidth=2)
 
-# ---- Rcrit lines ----
-ax.plot(t_global, np.full_like(t_global, Rcrit_Lu_norm),
-        '--', linewidth=1.5, label="Rcrit (Lu)")
-ax.plot(t_global, np.full_like(t_global, Rcrit_Cu_norm),
-        '--', linewidth=1.5, label="Rcrit (Cu)")
-
-# ---- Fill effective regions ----
-ax.fill_between(t_global, Rcrit_Lu_norm, Ddot_Lu_norm,
-                where=Ddot_Lu_norm > Rcrit_Lu_norm, alpha=0.2)
-
-ax.fill_between(t_global, Rcrit_Cu_norm, Ddot_Cu_norm,
-                where=Ddot_Cu_norm > Rcrit_Cu_norm, alpha=0.2)
+# Rcrit line
+ax.axhline(Rcrit_n, linestyle='--', linewidth=2, label="Rcrit")
 
 # -----------------------------
-# Axis formatting (Dale's request)
+# CORRECT SHADING
 # -----------------------------
-ax.set_xlim(0, t_max)      # same x-scale
-ax.set_ylim(0, 1.0)        # normalized y-scale
+# Effective = ONLY where curve is ABOVE Rcrit
+mask_Lu = Ddot_Lu_n > Rcrit_n
+mask_Cu = Ddot_Cu_n > Rcrit_n
+
+# Lu shading
+ax.fill_between(
+    t_global,
+    Rcrit_n,
+    Ddot_Lu_n,
+    where=mask_Lu,
+    interpolate=True,
+    alpha=0.25,
+    label="Effective (Lu)"
+)
+
+# Cu shading
+ax.fill_between(
+    t_global,
+    Rcrit_n,
+    Ddot_Cu_n,
+    where=mask_Cu,
+    interpolate=True,
+    alpha=0.25,
+    label="Effective (Cu)"
+)
+
+# -----------------------------
+# Formatting
+# -----------------------------
+ax.set_xlim(0, t_max)
+ax.set_ylim(0, 1.0)
 
 ax.set_xlabel("Time (hours)")
 ax.set_ylabel("Normalised Dose Rate")
-ax.set_title("Dose Rate Comparison (Normalised)")
+ax.set_title("Dose Rate Comparison (Normalised, Same Total Dose)")
 
-ax.legend()
 ax.grid(True)
+ax.legend()
 
 st.pyplot(fig)
 
 # -----------------------------
-# Key metrics
+# Insight metrics (optional but useful)
 # -----------------------------
-col1, col2 = st.columns(2)
+peak_ratio = Ddot_Cu.max() / Ddot_Lu.max()
 
-with col1:
-    st.subheader("177Lu Summary")
-    st.write(f"A0: {A0_Lu:.2f} MBq")
-    st.write(f"Efficiency: {eff_ratio_Lu:.3f}")
-    st.write(f"Wasted Dose: {waste_Lu:.2f} Gy")
-
-with col2:
-    st.subheader("64Cu Summary")
-    st.write(f"A0: {A0_Cu:.2f} MBq")
-    st.write(f"Efficiency: {eff_ratio_Cu:.3f}")
-    st.write(f"Wasted Dose: {waste_Cu:.2f} Gy")
+st.markdown("### Key Insight")
+st.write(f"Peak dose rate (64Cu / 177Lu): **{peak_ratio:.2f}× higher**")
