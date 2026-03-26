@@ -89,36 +89,49 @@ Ddot_Cu, Rcrit_Cu, total_Cu, eff_Cu, waste_Cu, eff_ratio_Cu = compute_dose(
 )
 
 # -----------------------------
-# Plotting
+# Normalisation (shared Y scale)
 # -----------------------------
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+max_val = max(Ddot_Lu.max(), Ddot_Cu.max())
 
-# ---- Lu ----
-ax = axes[0]
-ax.plot(t_global, Ddot_Lu, label="Dose Rate")
-ax.plot(t_global, np.full_like(t_global, Rcrit_Lu), '--', label="Rcrit")
+Ddot_Lu_norm = Ddot_Lu / max_val
+Ddot_Cu_norm = Ddot_Cu / max_val
+Rcrit_Lu_norm = Rcrit_Lu / max_val
+Rcrit_Cu_norm = Rcrit_Cu / max_val
 
-ax.fill_between(t_global, Rcrit_Lu, Ddot_Lu,
-                where=Ddot_Lu > Rcrit_Lu, alpha=0.3)
-ax.fill_between(t_global, 0, np.minimum(Ddot_Lu, Rcrit_Lu), alpha=0.2)
+# -----------------------------
+# Plotting (shared axes)
+# -----------------------------
+fig, ax = plt.subplots(figsize=(10, 6))
 
-ax.set_title(f"177Lu | Eff={eff_ratio_Lu:.2f} | Wasted={waste_Lu:.2f} Gy | A0={A0_Lu:.1f} MBq")
-ax.set_xlabel("Time (h)")
-ax.set_ylabel("Dose Rate (Gy/h)")
+# ---- Curves ----
+ax.plot(t_global, Ddot_Lu_norm, label="177Lu", linewidth=2)
+ax.plot(t_global, Ddot_Cu_norm, label="64Cu", linewidth=2)
+
+# ---- Rcrit lines ----
+ax.plot(t_global, np.full_like(t_global, Rcrit_Lu_norm),
+        '--', linewidth=1.5, label="Rcrit (Lu)")
+ax.plot(t_global, np.full_like(t_global, Rcrit_Cu_norm),
+        '--', linewidth=1.5, label="Rcrit (Cu)")
+
+# ---- Fill effective regions ----
+ax.fill_between(t_global, Rcrit_Lu_norm, Ddot_Lu_norm,
+                where=Ddot_Lu_norm > Rcrit_Lu_norm, alpha=0.2)
+
+ax.fill_between(t_global, Rcrit_Cu_norm, Ddot_Cu_norm,
+                where=Ddot_Cu_norm > Rcrit_Cu_norm, alpha=0.2)
+
+# -----------------------------
+# Axis formatting (Dale's request)
+# -----------------------------
+ax.set_xlim(0, t_max)      # same x-scale
+ax.set_ylim(0, 1.0)        # normalized y-scale
+
+ax.set_xlabel("Time (hours)")
+ax.set_ylabel("Normalised Dose Rate")
+ax.set_title("Dose Rate Comparison (Normalised)")
+
 ax.legend()
-
-# ---- Cu ----
-ax = axes[1]
-ax.plot(t_global, Ddot_Cu, label="Dose Rate")
-ax.plot(t_global, np.full_like(t_global, Rcrit_Cu), '--', label="Rcrit")
-
-ax.fill_between(t_global, Rcrit_Cu, Ddot_Cu,
-                where=Ddot_Cu > Rcrit_Cu, alpha=0.3)
-ax.fill_between(t_global, 0, np.minimum(Ddot_Cu, Rcrit_Cu), alpha=0.2)
-
-ax.set_title(f"64Cu | Eff={eff_ratio_Cu:.2f} | Wasted={waste_Cu:.2f} Gy | A0={A0_Cu:.1f} MBq")
-ax.set_xlabel("Time (h)")
-ax.legend()
+ax.grid(True)
 
 st.pyplot(fig)
 
