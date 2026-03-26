@@ -36,12 +36,23 @@ def activity_curve(A0, Tphys, Tbio, t):
 
 def compute_dose(A0, Tphys, Tbio, S, t):
     A = activity_curve(A0, Tphys, Tbio, t)
-    return S * A
+    return S * A, A
 
 def compute_A0_for_target(D_target, Tphys, Tbio, S):
     A_norm = activity_curve(1.0, Tphys, Tbio, t_global)
     integral = trapz_manual(S * A_norm, t_global)
     return D_target / integral
+
+def find_crossing(t, curve, threshold):
+    diff = curve - threshold
+    sign_change = np.where(np.diff(np.sign(diff)) != 0)[0]
+
+    if len(sign_change) == 0:
+        return None, None
+
+    i = sign_change[0]
+    t_cross = t[i]
+    return t_cross, i
 
 # -----------------------------
 # Sidebar controls
@@ -68,24 +79,33 @@ A0_Lu = compute_A0_for_target(D_target, Tphys_Lu, Tbio_Lu, S)
 A0_Cu = compute_A0_for_target(D_target, Tphys_Cu, Tbio_Cu, S)
 
 # -----------------------------
-# Dose rate curves
+# Dose + activity
 # -----------------------------
-Ddot_Lu = compute_dose(A0_Lu, Tphys_Lu, Tbio_Lu, S, t_global)
-Ddot_Cu = compute_dose(A0_Cu, Tphys_Cu, Tbio_Cu, S, t_global)
+Ddot_Lu, A_Lu = compute_dose(A0_Lu, Tphys_Lu, Tbio_Lu, S, t_global)
+Ddot_Cu, A_Cu = compute_dose(A0_Cu, Tphys_Cu, Tbio_Cu, S, t_global)
 
 # -----------------------------
-# Shared Rcrit (IMPORTANT)
+# Rcrit
 # -----------------------------
 Rcrit = 0.693 / (alpha * Tav)
 
 # -----------------------------
-# Normalisation (shared scale)
+# Normalisation
 # -----------------------------
 max_val = max(Ddot_Lu.max(), Ddot_Cu.max())
 
 Ddot_Lu_n = Ddot_Lu / max_val
 Ddot_Cu_n = Ddot_Cu / max_val
 Rcrit_n = Rcrit / max_val
+
+# -----------------------------
+# Crossing points
+# -----------------------------
+t_cross_Lu, idx_Lu = find_crossing(t_global, Ddot_Lu, Rcrit)
+t_cross_Cu, idx_Cu = find_crossing(t_global, Ddot_Cu, Rcrit)
+
+A_cross_Lu = A_Lu[idx_Lu] if idx_Lu is not None else None
+A_cross_Cu = A_Cu[idx_Cu] if idx_Cu is not None else None
 
 # -----------------------------
 # Plot
@@ -96,17 +116,31 @@ fig, ax = plt.subplots(figsize=(10, 6))
 ax.plot(t_global, Ddot_Lu_n, label="177Lu", linewidth=2)
 ax.plot(t_global, Ddot_Cu_n, label="64Cu", linewidth=2)
 
-# Rcrit line
+# Rcrit
 ax.axhline(Rcrit_n, linestyle='--', linewidth=2, label="Rcrit")
 
 # -----------------------------
-# CORRECT SHADING
+# Shading
 # -----------------------------
-# Effective = ONLY where curve is ABOVE Rcrit
 mask_Lu = Ddot_Lu_n > Rcrit_n
 mask_Cu = Ddot_Cu_n > Rcrit_n
 
-# Lu shading
+# NOT wasted (below Rcrit)
+ax.fill_between(
+    t_global,
+    0,
+    np.minimum(Ddot_Lu_n, Rcrit_n),
+    alpha=0.08
+)
+
+ax.fill_between(
+    t_global,
+    0,
+    np.minimum(Ddot_Cu_n, Rcrit_n),
+    alpha=0.08
+)
+
+# Effective (above Rcrit)
 ax.fill_between(
     t_global,
     Rcrit_n,
@@ -117,7 +151,6 @@ ax.fill_between(
     label="Effective (Lu)"
 )
 
-# Cu shading
 ax.fill_between(
     t_global,
     Rcrit_n,
@@ -127,6 +160,19 @@ ax.fill_between(
     alpha=0.25,
     label="Effective (Cu)"
 )
+
+# -----------------------------
+# Crossing markers
+# -----------------------------
+if idx_Lu is not None:
+    ax.scatter(t_cross_Lu, Rcrit_n, s=50)
+    ax.annotate("Lu cross", (t_cross_Lu, Rcrit_n),
+                xytext=(10, 10), textcoords='offset points')
+
+if idx_Cu is not None:
+    ax.scatter(t_cross_Cu, Rcrit_n, s=50)
+    ax.annotate("Cu cross", (t_cross_Cu, Rcrit_n),
+                xytext=(10, -15), textcoords='offset points')
 
 # -----------------------------
 # Formatting
@@ -144,9 +190,24 @@ ax.legend()
 st.pyplot(fig)
 
 # -----------------------------
-# Insight metrics (optional but useful)
+# Output values
 # -----------------------------
-peak_ratio = Ddot_Cu.max() / Ddot_Lu.max()
+st.markdown("### Crossing Points")
 
-st.markdown("### Key Insight")
-st.write(f"Peak dose rate (64Cu / 177Lu): **{peak_ratio:.2f}× higher**")
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("177Lu")
+    if t_cross_Lu is not None:
+        st.write(f"Time: {t_cross_Lu:.2f} h")
+        st.write(f"Activity: {A_cross_Lu:.2f} MBq")
+    else:
+        st.write("No crossing with Rcrit")
+
+with col2:
+    st.subheader("64Cu")
+    if t_cross_Cu is not None:
+        st.write(f"Time: {t_cross_Cu:.2f} h")
+        st.write(f"Activity: {A_cross_Cu:.2f} MBq")
+    else:
+        st.write("No crossing with Rcrit")
